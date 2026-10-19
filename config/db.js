@@ -1,34 +1,25 @@
+
 const mysql = require('mysql2/promise');
 
 let pool;
 let initializationPromise;
 
 async function initializeDatabase() {
-  const dbName = process.env.DB_NAME || 'smart_parking_finder';
-
-  const connection = await mysql.createConnection({
-    host: process.env.DB_HOST || '127.0.0.1',
-    port: Number(process.env.DB_PORT || 3306),
-    user: process.env.DB_USER || 'root',
-    password: process.env.DB_PASSWORD || '',
-    multipleStatements: true,
-  });
-
-  await connection.execute(`CREATE DATABASE IF NOT EXISTS \`${dbName}\``);
-  await connection.end();
-
   pool = mysql.createPool({
-    host: process.env.DB_HOST || '127.0.0.1',
+    host: process.env.DB_HOST,
     port: Number(process.env.DB_PORT || 3306),
-    user: process.env.DB_USER || 'root',
-    password: process.env.DB_PASSWORD || '',
-    database: dbName,
+    user: process.env.DB_USER,
+    password: process.env.DB_PASSWORD,
+    database: process.env.DB_NAME || 'defaultdb',
+    ssl: {
+      rejectUnauthorized: true,
+    },
     waitForConnections: true,
-    connectionLimit: 20,
+    connectionLimit: 5,
     queueLimit: 0,
-    multipleStatements: true,
   });
 
+  // Create the tables inside the existing Aiven database.
   await pool.execute(`
     CREATE TABLE IF NOT EXISTS users (
       id INT AUTO_INCREMENT PRIMARY KEY,
@@ -62,9 +53,14 @@ async function initializeDatabase() {
     )
   `);
 
-  const [vehicleColumn] = await pool.query('SHOW COLUMNS FROM parkings LIKE ?', ['vehicle_type']);
+  const [vehicleColumn] = await pool.query(
+    "SHOW COLUMNS FROM parkings LIKE 'vehicle_type'"
+  );
+
   if (!vehicleColumn.length) {
-    await pool.query('ALTER TABLE parkings ADD COLUMN vehicle_type VARCHAR(50) NOT NULL DEFAULT "Car"');
+    await pool.query(
+      'ALTER TABLE parkings ADD COLUMN vehicle_type VARCHAR(50) NOT NULL DEFAULT "Car"'
+    );
   }
 
   await pool.execute(`
@@ -91,26 +87,29 @@ async function initializeDatabase() {
 }
 
 async function connectDB() {
-  if (pool) {
-    return pool;
-  }
+  if (pool) return pool;
 
   if (!initializationPromise) {
-    initializationPromise = initializeDatabase().catch((error) => {
+    initializationPromise = initializeDatabase().catch(async (error) => {
       initializationPromise = null;
+
+      if (pool) {
+        await pool.end().catch(() => {});
+        pool = null;
+      }
+
       throw error;
     });
   }
 
   await initializationPromise;
+  await pool.query('SELECT 1');
   console.log('MySQL connected');
   return pool;
 }
 
 async function query(sql, params = []) {
-  if (!pool) {
-    await connectDB();
-  }
+  if (!pool) await connectDB();
 
   const [rows] = await pool.execute(sql, params);
   return rows;
