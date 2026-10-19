@@ -1,4 +1,4 @@
-const { v4: uuidv4 } = require('uuid');
+const { randomUUID } = require('crypto');
 const Booking = require('../models/Booking');
 const Parking = require('../models/Parking');
 const { query } = require('../config/db');
@@ -64,7 +64,7 @@ exports.createBooking = async (req, res) => {
 
     const totalPrice = Number((Number(parking.pricePerHour) * duration).toFixed(2));
     const booking = await Booking.create({
-      bookingId: `SPF-${uuidv4().slice(0, 8).toUpperCase()}`,
+      bookingId: `SPF-${randomUUID().slice(0, 8).toUpperCase()}`,
       user: req.user._id || req.user.id,
       parking: parkingId,
       slotId: slotId || `slot-${Date.now()}`,
