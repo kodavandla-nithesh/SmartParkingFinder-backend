@@ -6,20 +6,28 @@ let pool;
 let initializationPromise;
 
 async function initializeDatabase() {
+  const isLocalDatabase = ['localhost', '127.0.0.1', '::1'].includes(
+    process.env.DB_HOST
+  );
+
   pool = mysql.createPool({
     host: process.env.DB_HOST,
     port: Number(process.env.DB_PORT || 3306),
     user: process.env.DB_USER,
     password: process.env.DB_PASSWORD,
     database: process.env.DB_NAME || 'defaultdb',
-    ssl: {
-  ca: fs.readFileSync(path.join(__dirname, 'ca.pem'), 'utf8'),
-  rejectUnauthorized: true,
-},
+
     waitForConnections: true,
     connectionLimit: 5,
     queueLimit: 0,
   });
+
+    ...(!isLocalDatabase && {
+      ssl: {
+        ca: fs.readFileSync(path.join(__dirname, 'ca.pem'), 'utf8'),
+        rejectUnauthorized: true,
+      },
+    }),
 
   // Create the tables inside the existing Aiven database.
   await pool.execute(`
