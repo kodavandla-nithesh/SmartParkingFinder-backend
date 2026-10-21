@@ -1,3 +1,4 @@
+
 const mysql = require('mysql2/promise');
 const fs = require('fs');
 const path = require('path');
@@ -10,26 +11,27 @@ async function initializeDatabase() {
     process.env.DB_HOST
   );
 
-  pool = mysql.createPool({
+  const databaseConfig = {
     host: process.env.DB_HOST,
     port: Number(process.env.DB_PORT || 3306),
     user: process.env.DB_USER,
     password: process.env.DB_PASSWORD,
     database: process.env.DB_NAME || 'defaultdb',
-
     waitForConnections: true,
     connectionLimit: 5,
     queueLimit: 0,
-  });
+  };
 
-    ...(!isLocalDatabase && {
-      ssl: {
-        ca: fs.readFileSync(path.join(__dirname, 'ca.pem'), 'utf8'),
-        rejectUnauthorized: true,
-      },
-    }),
+  if (!isLocalDatabase) {
+    databaseConfig.ssl = {
+      ca: fs.readFileSync(path.join(__dirname, 'ca.pem'), 'utf8'),
+      rejectUnauthorized: true,
+    };
+  }
 
-  // Create the tables inside the existing Aiven database.
+  pool = mysql.createPool(databaseConfig);
+
+  // Create the tables inside the existing database.
   await pool.execute(`
     CREATE TABLE IF NOT EXISTS users (
       id INT AUTO_INCREMENT PRIMARY KEY,
