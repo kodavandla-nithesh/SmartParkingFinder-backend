@@ -1,5 +1,6 @@
-
 const mysql = require('mysql2/promise');
+const fs = require('fs');
+const path = require('path');
 
 let pool;
 let initializationPromise;
@@ -12,8 +13,9 @@ async function initializeDatabase() {
     password: process.env.DB_PASSWORD,
     database: process.env.DB_NAME || 'defaultdb',
     ssl: {
-      rejectUnauthorized: true,
-    },
+  ca: fs.readFileSync(path.join(__dirname, 'ca.pem'), 'utf8'),
+  rejectUnauthorized: true,
+},
     waitForConnections: true,
     connectionLimit: 5,
     queueLimit: 0,
